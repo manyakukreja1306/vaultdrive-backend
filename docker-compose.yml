@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  backend:
+    build: .
+    container_name: vaultdrive-app
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - DB_HOST=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=vaultdrive
+
+  postgres:
+    image: postgres:15
+    container_name: vaultdrive-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: vaultdrive
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
