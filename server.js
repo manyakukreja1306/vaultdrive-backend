@@ -1,25 +1,8 @@
 require("dotenv").config();
+const app = require("./src/app");
 
-const express = require("express");
-const app = express();
+const PORT = process.env.PORT || 5000;
 
-const fileRoutes = require("./src/routes/fileRoutes");
-const authRoutes = require("./src/routes/authRoutes"); // restored
-const analyticsRoutes = require("./src/routes/analyticsRoutes");
-
-app.use(express.json());
-
-app.use("/api/files", fileRoutes);
-app.use("/api/auth", authRoutes); // restored
-app.use("/api/analytics", analyticsRoutes);
-
-app.get("/", (req, res) => {
-  res.send("VaultDrive API Running");
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
-});
-
-
-
