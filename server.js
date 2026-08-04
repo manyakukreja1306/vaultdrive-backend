@@ -2,6 +2,7 @@ require("dotenv").config();
 const app = require("./src/app");
 const { connectProducer } = require("./src/services/kafkaProducerService");
 const { startConsumer } = require("./src/services/kafkaConsumerService");
+const { startTrashCleanupScheduler } = require("./src/scheduler/trashCleanupScheduler");
 
 const PORT = process.env.PORT || 5000;
 
@@ -15,4 +16,7 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error("Kafka startup error (non-fatal):", err.message);
   }
+
+  // Start scheduled tasks
+  startTrashCleanupScheduler();
 });
