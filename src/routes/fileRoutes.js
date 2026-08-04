@@ -4,11 +4,20 @@ const multer = require("multer");
 const auth = require("../middleware/auth");
 const { asyncHandler } = require("../middleware/errorHandler");
 const fileService = require("../services/fileService");
+const shareService = require("../services/shareService");
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5368709120 },
 });
+
+// Public share link resolution (no auth required)
+router.get("/share/:token", asyncHandler(async (req, res) => {
+  const { password } = req.query;
+  const result = await shareService.resolveShareLink(req.params.token, password);
+  res.json(result);
+}));
+
 
 // Upload
 router.post("/upload", auth, upload.single("file"), asyncHandler(async (req, res) => {
