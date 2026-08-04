@@ -4,29 +4,103 @@ services:
   backend:
     build: .
     container_name: vaultdrive-app
+    restart: unless-stopped
     ports:
       - "5000:5000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+    env_file:
+      - .env
     environment:
       - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=vaultdrive
+      - REDIS_HOST=redis
+      - KAFKA_BROKERS=kafka:9092
+    networks:
+      - vaultdrive-network
 
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: vaultdrive-db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: vaultdrive
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vaultdrive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - vaultdrive-network
 
   redis:
-    image: redis
+    image: redis:7-alpine
+    container_name: vaultdrive-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - vaultdrive-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: vaultdrive-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - vaultdrive-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: vaultdrive-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - vaultdrive-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: vaultdrive-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - vaultdrive-network
+
+networks:
+  vaultdrive-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
