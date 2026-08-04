@@ -1,33 +1,37 @@
 const express = require("express");
 const router = express.Router();
 const authService = require("../services/authService");
+const validate = require("../middleware/validate");
+const { asyncHandler } = require("../middleware/errorHandler");
+const { registerSchema, loginSchema } = require("../dto/request/authSchemas");
 
-router.post("/register", async (req, res) => {
-  try {
-    const user = await authService.register(
-      req.body.email,
-      req.body.password
-    );
+router.post("/register", validate(registerSchema), asyncHandler(async (req, res) => {
+  const { email, password, displayName } = req.body;
+  const result = await authService.register(email, password, displayName);
+  res.status(201).json(result);
+}));
 
-    res.json(user);
-  } catch (err) {
-    console.log("REGISTER ERROR:", err); // 
-    res.status(400).json({ message: err.message || "Register failed" });
+router.post("/login", validate(loginSchema), asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const result = await authService.login(email, password);
+  res.status(200).json(result);
+}));
+
+router.post("/refresh", asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(400).json({ message: "refreshToken is required" });
   }
-});
+  const result = await authService.refreshToken(refreshToken);
+  res.status(200).json(result);
+}));
 
-router.post("/login", async (req, res) => {
-  try {
-    const token = await authService.login(
-      req.body.email,
-      req.body.password
-    );
-
-    res.json({ token });
-  } catch (err) {
-    console.log("LOGIN ERROR:", err); // ADD THIS
-    res.status(400).json({ message: err.message || "Login failed" });
+router.post("/logout", asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    await authService.logout(refreshToken);
   }
-});
+  res.status(204).send();
+}));
 
 module.exports = router;
