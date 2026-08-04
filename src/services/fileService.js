@@ -5,6 +5,8 @@ const s3 = require("../config/s3");
 const { redis, REDIS_PREFIXES, TTL } = require("../config/redis");
 const StorageLimitException = require("../exceptions/StorageLimitException");
 const FileNotFoundException = require("../exceptions/FileNotFoundException");
+const { publishEvent } = require("./kafkaProducerService");
+const { createUploadEvent } = require("../kafka/uploadEvent");
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp",
@@ -81,7 +83,8 @@ exports.uploadFile = async ({ fileBuffer, originalFile, userId, folderId }) => {
   const keys = await redis.keys(cachePattern);
   if (keys.length > 0) await redis.del(keys);
 
-  return {
+  // 7. Publish upload event to Kafka (non-fatal)
+  const result = {
     fileReferenceId: ref.id,
     displayName: ref.display_name,
     sizeBytes: blob.size_bytes,
@@ -93,6 +96,18 @@ exports.uploadFile = async ({ fileBuffer, originalFile, userId, folderId }) => {
       ? `File deduplicated — saved ${bytesSaved} bytes`
       : "File uploaded successfully",
   };
+
+  await publishEvent(createUploadEvent({
+    fileReferenceId: ref.id,
+    userId,
+    sha256Hash: blob.sha256_hash,
+    sizeBytes: blob.size_bytes,
+    mimeType: blob.mime_type,
+    wasDeduplicated,
+    bytesSaved,
+  }));
+
+  return result;
 };
 
 exports.listFiles = async (userId, folderId, page = 1, size = 20) => {
